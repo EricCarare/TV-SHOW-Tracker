@@ -48,7 +48,9 @@ export default function SerialPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ episodesWatched: updated }),
-    });
+    })
+    
+;
   };
 
   
