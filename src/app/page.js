@@ -91,14 +91,22 @@ export default function Home() {
   return (
     <main className="p-8 space-y-12">
       <div className="text-sm text-right mb-4 text-white">
-        <p className="mb-2">Salut, {session.user.name}</p>
-        <button
-          onClick={() => signOut()}
-          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
-        >
-          Logout
-        </button>
-      </div>
+  <p className="mb-2">Salut, {session.user.name}</p>
+  <div className="flex justify-end gap-3">
+    <a
+      href="/stats"
+      className="bg-cyan-700 hover:bg-cyan-800 text-white px-3 py-1 rounded text-sm"
+    >
+      Statistici
+    </a>
+    <button
+      onClick={() => signOut()}
+      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
+    >
+      Logout
+    </button>
+  </div>
+</div>
 
       <h1 className="text-4xl font-bold text-cyan-200 mb-4">TV Show Tracker</h1>
 
@@ -236,13 +244,32 @@ export default function Home() {
           <p className="text-gray-500 italic">Niciun serial complet vizionat încă.</p>
         ) : (
           <ul className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {watchedShows.map((show) => (
-              <li key={show._id} className="bg-slate-800 p-3 rounded shadow text-sm">
-                <img src={show.image} alt={show.title} className="rounded mb-1" />
-                <h3 className="text-white font-semibold">{show.title}</h3>
-              </li>
-            ))}
-          </ul>
+  {watchedShows.map((show) => (
+    <Link href={`/serial/${show.showId}`} key={show._id}>
+      <li className="cursor-pointer bg-slate-800 p-3 rounded shadow hover:shadow-xl transition text-sm hover:scale-105">
+        <img src={show.image} alt={show.title} className="rounded mb-1" />
+        <h3 className="text-white font-semibold">{show.title}</h3>
+        <p className="text-xs text-slate-400">ID: {show.showId}</p>
+         <div className="flex gap-1 mt-2">
+    {[1, 2, 3, 4, 5].map((star) => (
+      <span
+        key={star}
+        onClick={async (e) => {
+          e.preventDefault();
+          await fetch(`/api/rate-show?id=${show._id}&rating=${star}`, { method: "PATCH" });
+          const updated = await fetch("/api/shows").then((res) => res.json());
+          setShows(updated);
+        }}
+        className={`cursor-pointer text-xl ${show.rating >= star ? "text-yellow-400" : "text-gray-600"}`}
+      >
+        ★
+      </span>
+    ))}
+  </div>
+      </li>
+    </Link>
+  ))}
+</ul>
         )}
       </section>
     </main>
