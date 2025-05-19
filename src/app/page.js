@@ -1,103 +1,256 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useState } from "react";
+import { Trash, Eye, CheckCircle } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [shows, setShows] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [seasonProgress, setSeasonProgress] = useState({});
+  const [watchedList, setWatchedList] = useState([]);
+  const [unwatchedList, setUnwatchedList] = useState([]);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+useEffect(() => {
+  const listWatched = [];
+  const listUnwatched = [];
+
+  for (const show of shows) {
+    const prog = seasonProgress[show.showId];
+
+    if (!prog) {
+      listUnwatched.push(show);
+      continue;
+    }
+
+    const allComplete = Object.values(prog).every((v) => v === true);
+    if (allComplete) {
+      listWatched.push(show);
+    } else {
+      listUnwatched.push(show);
+    }
+  }
+
+  setWatchedList(listWatched);
+  setUnwatchedList(listUnwatched);
+}, [shows, seasonProgress]);
+
+  useEffect(() => {
+    fetch("/api/shows")
+      .then((res) => res.json())
+      .then((data) => setShows(data));
+  }, []);
+  useEffect(() => {
+  async function calculateProgress() {
+    const progressData = {};
+
+    for (const show of shows) {
+      const res = await fetch(`https://api.tvmaze.com/shows/${show.showId}/episodes`);
+      if (!res.ok) continue;
+
+      const episodes = await res.json();
+
+      // Grupăm episoadele după sezon
+      const episodesBySeason = episodes.reduce((acc, ep) => {
+        if (!acc[ep.season]) acc[ep.season] = [];
+        acc[ep.season].push(ep.id);
+        return acc;
+      }, {});
+
+      // Verificăm ce sezoane sunt complet bifate
+      const watched = show.episodesWatched || [];
+      const seasonStatus = {};
+
+      for (const [season, epIds] of Object.entries(episodesBySeason)) {
+        const allWatched = epIds.every((id) => watched.includes(id));
+        seasonStatus[`S${season}`] = allWatched;
+      }
+
+      progressData[show.showId] = seasonStatus;
+    }
+
+    setSeasonProgress(progressData);
+  }
+
+  if (shows.length > 0) {
+    calculateProgress();
+  }
+}, [shows]);
+
+
+  const deleteShow = async (id) => {
+    const res = await fetch(`/api/delete-show?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
+      const updated = await fetch("/api/shows").then((res) => res.json());
+      setShows(updated);
+    }
+  };
+
+  return (
+    <main className="p-8 space-y-12">
+      <h1 className="text-4xl font-bold text-cyan-200 mb-4">TV Show Tracker</h1>
+
+      {/* FORMULARE - 2 coloane */}
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Formular manual */}
+        <div>
+          <h2 className="text-2xl mb-2 text-cyan-200">Adaugă manual</h2>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const title = formData.get("title");
+              const showId = Number(formData.get("showId"));
+              const image = formData.get("image");
+
+              const res = await fetch("/api/add-show", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ title, showId, image })
+              });
+
+              if (res.ok) {
+                e.target.reset();
+                const updated = await fetch("/api/shows").then((res) => res.json());
+                setShows(updated);
+              }
+            }}
+            className="flex flex-col gap-3"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            <input name="title" placeholder="Titlu serial" required className="bg-slate-800 border border-slate-700 p-2 rounded text-white" />
+            <input name="showId" placeholder="ID TVMaze" required className="bg-slate-800 border border-slate-700 p-2 rounded text-white" />
+            <input name="image" placeholder="URL imagine" required className="bg-slate-800 border border-slate-700 p-2 rounded text-white" />
+            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded transition">Adaugă</button>
+          </form>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+
+        {/* Căutare TVmaze */}
+        <div>
+          <h2 className="text-2xl mb-2 text-cyan-200">Caută pe TVmaze</h2>
+          <input
+            type="text"
+            placeholder="Ex: game of thrones"
+            className="bg-slate-800 border border-slate-700 p-2 rounded text-white w-full mb-3"
+            onChange={async (e) => {
+              const q = e.target.value;
+              if (q.length < 3) {
+                setSearchResults([]);
+                return;
+              }
+
+              const res = await fetch(`https://api.tvmaze.com/search/shows?q=${q}`);
+              const data = await res.json();
+              setSearchResults(data);
+            }}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {searchResults.map((result) => {
+              const show = result.show;
+              return (
+                <li key={show.id} className="bg-slate-800 p-3 rounded shadow hover:scale-105 transition transform duration-200">
+                  <img src={show.image?.medium} alt={show.name} className="rounded mb-2" />
+                  <h3 className="font-semibold text-white">{show.name}</h3>
+                  <button
+                    className="mt-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+                    onClick={async () => {
+                      const res = await fetch("/api/add-show", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          title: show.name,
+                          showId: show.id,
+                          image: show.image?.medium || ""
+                        })
+                      });
+
+                      if (res.ok) {
+                        const updated = await fetch("/api/shows").then((res) => res.json());
+                        setShows(updated);
+                      }
+                    }}
+                  >
+                    Adaugă în Watchlist
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </section>
+
+      {/* WATCHLIST */}
+      <section>
+  <h2 className="text-2xl mb-4 text-cyan-200 flex items-center gap-2">
+    <Eye size={24} /> Watchlist
+  </h2>
+  {unwatchedList.length === 0 ? (
+    <p className="text-gray-400">Nimic în watchlist.</p>
+  ) : (
+    <ul className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {unwatchedList.map((show) => (
+        <Link href={`/serial/${show.showId}`} key={show._id}>
+          <li className="cursor-pointer bg-slate-800 p-3 rounded shadow hover:shadow-xl transition text-sm relative hover:scale-105">
+            <img src={show.image} alt={show.title} className="rounded mb-1" />
+            <h3 className="text-white font-semibold">{show.title}</h3>
+            <p className="text-xs text-slate-400">ID: {show.showId}</p>
+            <div className="text-xs mt-1 text-cyan-300">
+              Sezoane:&nbsp;
+              {seasonProgress[show.showId]
+                ? Object.entries(seasonProgress[show.showId]).map(([s, done]) => (
+                    <span key={s} className="mr-1">
+                      {s} {done ? "✅" : "⬜"}
+                    </span>
+                  ))
+                : "…"}
+            </div>
+
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                deleteShow(show._id);
+              }}
+              className="absolute top-2 right-2 text-red-500 hover:text-red-300 transition"
+            >
+              <Trash size={18} />
+            </button>
+          </li>
+        </Link>
+      ))}
+    </ul>
+  )}
+</section>
+
+      {/* WATCHED */}
+      <section>
+  <h2 className="text-2xl mt-12 mb-2 text-cyan-200 flex items-center gap-2">
+    <CheckCircle size={24} /> Watched
+  </h2>
+  {watchedList.length === 0 ? (
+    <p className="text-gray-400 italic">Niciun serial finalizat încă.</p>
+  ) : (
+    <ul className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {watchedList.map((show) => (
+        <Link href={`/serial/${show.showId}`} key={show._id}>
+          <li className="cursor-pointer bg-slate-800 p-3 rounded shadow hover:shadow-xl transition text-sm relative hover:scale-105">
+            <img src={show.image} alt={show.title} className="rounded mb-1" />
+            <h3 className="text-white font-semibold">{show.title}</h3>
+            <p className="text-xs text-slate-400">ID: {show.showId}</p>
+            <div className="text-xs mt-1 text-cyan-300">
+              Sezoane:&nbsp;
+              {seasonProgress[show.showId]
+                ? Object.entries(seasonProgress[show.showId]).map(([s, done]) => (
+                    <span key={s} className="mr-1">
+                      {s} {done ? "✅" : "⬜"}
+                    </span>
+                  ))
+                : "…"}
+            </div>
+          </li>
+        </Link>
+      ))}
+    </ul>
+  )}
+</section>
+    </main>
   );
 }
